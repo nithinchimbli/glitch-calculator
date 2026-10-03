@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Calculator</title>
+<style>
+:root{--bg:#000;--num:#333;--fn:#a5a5a5;--op:#ff9f0a;--txt:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{height:100%;margin:0;background:#000;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Helvetica,Arial,sans-serif}
+.calc{height:100%;max-width:430px;margin:0 auto;padding:12px 16px 16px;display:flex;flex-direction:column;justify-content:flex-end}
+#display{color:#fff;text-align:right;font-weight:300;font-size:88px;line-height:1.1;padding:0 8px 14px;white-space:nowrap;overflow:hidden}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+button{aspect-ratio:1;border:0;border-radius:50%;font:400 34px -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;color:#fff;background:var(--num);cursor:pointer;transition:filter .15s}
+button:active{filter:brightness(1.6);transition:none}
+button:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.fn{background:var(--fn);color:#000;font-size:32px}
+.op{background:var(--op);font-size:44px}
+.op:active{filter:brightness(1.25)}
+.op.on{background:#fff;color:var(--op)}
+.zero{grid-column:span 2;aspect-ratio:auto;border-radius:999px;text-align:left;padding-left:32px}
+@media (max-height:700px){#display{font-size:64px}button{font-size:28px}.op{font-size:36px}}
+</style>
+</head>
+<body>
+<div class="calc">
+  <div id="display">0</div>
+  <div class="grid" id="keys">
+    <button class="fn" data-k="ac" id="ac">AC</button>
+    <button class="fn" data-k="neg">+/−</button>
+    <button class="fn" data-k="pct">%</button>
+    <button class="op" data-k="/">÷</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button class="op" data-k="*">×</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button class="op" data-k="-">−</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button class="op" data-k="+">+</button>
+    <button class="zero" data-k="0">0</button>
+    <button data-k=".">.</button>
+    <button class="op" data-k="=">=</button>
+  </div>
+</div>
+<script>
+const disp=document.getElementById('display'),acBtn=document.getElementById('ac');
+let cur='0',prev=null,op=null,fresh=true,last=null;
+
+function fmt(s){
+  if(s==='Error')return s;
+  let [i,d]=s.split('.');
+  const neg=i.startsWith('-');if(neg)i=i.slice(1);
+  i=i.replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  return (neg?'-':'')+i+(d!==undefined?'.'+d:'');
+}
+function num(n){
+  if(!isFinite(n))return 'Error';
+  let s=String(+n.toPrecision(9));
+  if(s.includes('e'))s=n.toExponential(4).replace('+','');
+  return s;
+}
+function render(){
+  disp.textContent=fmt(cur);
+  let size=window.innerHeight<700?64:88;
+  disp.style.fontSize=size+'px';
+  while(disp.scrollWidth>disp.clientWidth-16&&size>30){size-=2;disp.style.fontSize=size+'px';}
+  acBtn.textContent=(cur!=='0'&&!fresh)||(cur!=='0'&&op===null)?'C':'AC';
+  document.querySelectorAll('.op').forEach(b=>b.classList.toggle('on',fresh&&op&&b.dataset.k===op&&b.dataset.k!=='='));
+}
+function calc(a,b,o){
+  a=parseFloat(a);b=parseFloat(b);
+  if(o==='+')return num(a+b);
+  if(o==='-')return num(a-b);
+  if(o==='*')return num(a*b);
+  if(o==='/')return b===0?'Error':num(a/b);
+  return num(b);
+}
+function digit(d){
+  if(fresh){cur=d==='.'?'0.':d;fresh=false;}
+  else if(d==='.'){if(!cur.includes('.'))cur+='.';}
+  else if(cur.replace(/[-.]/g,'').length<9)cur=cur==='0'?d:(cur==='-0'?'-'+d:cur+d);
+  render();
+}
+function operator(o){
+  if(op&&!fresh){cur=calc(prev,cur,op);}
+  prev=cur;op=o;fresh=true;last=null;render();
+}
+function equals(){
+  if(op){last={o:op,v:cur};cur=calc(prev,cur,op);op=null;}
+  else if(last){cur=calc(cur,last.v,last.o);}
+  fresh=true;render();
+}
+function press(k){
+  if(cur==='Error'&&k!=='ac')return;
+  if(/^[0-9.]$/.test(k))digit(k);
+  else if('+-*/'.includes(k))operator(k);
+  else if(k==='=')equals();
+  else if(k==='ac'){
+    if(acBtn.textContent==='C'){cur='0';fresh=true;}
+    else{cur='0';prev=null;op=null;fresh=true;last=null;}
+    render();
+  }
+  else if(k==='neg'){cur=cur.startsWith('-')?cur.slice(1):(cur==='0'?'-0':'-'+cur);render();}
+  else if(k==='pct'){cur=num(parseFloat(cur)/100);render();}
+}
+document.getElementById('keys').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(b)press(b.dataset.k);
+});
+document.addEventListener('keydown',e=>{
+  const m={Enter:'=','=':'=',Escape:'ac','%':'pct'};
+  if(e.key==='Backspace'){if(!fresh&&cur.length>1){cur=cur.slice(0,-1);if(cur==='-')cur='0';}else cur='0';render();return;}
+  if(/^[0-9.+\-*/]$/.test(e.key))press(e.key);
+  else if(m[e.key])press(m[e.key]);
+});
+window.addEventListener('resize',render);
+render();
+</script>
+</body>
+</html>
